@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "boxporter"
+version = "0.1.0"
+description = "A human-readable task-box protocol for coordinating coding agents"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{name = "Wenle Pan"}]
+keywords = ["ai-agents", "multi-agent", "orchestration", "claude-code", "codex"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Topic :: Software Development :: Build Tools",
+]
+dependencies = []
+
+[dependency-groups]
+dev = [
+  "mypy>=1.10",
+  "pytest>=8",
+  "ruff>=0.9",
+]
+
+[project.scripts]
+boxporter = "boxporter.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+files = ["src"]
+exclude = ["^(build|dist|tests)/"]
