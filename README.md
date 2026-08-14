@@ -40,6 +40,8 @@ PENDING -> READY -> WORKING -> REVIEW_PENDING -> PASS
 - **执行与审核分离**：执行者不能给自己的提交判 `PASS`。
 - **内容寻址**：审核绑定 `result.md + verify.md` 的 SHA-256，提交后改证据会失效。
 - **低 Token**：`tick` 没有状态变化时不会调用模型。
+- **依赖感知**：只有 `depends_on` 已全部 PASS 的任务才会进入活动箱。
+- **有界收敛**：默认两轮审核；具体待修项持续减少时最多扩展到四轮，否则转人工。
 - **崩溃安全**：临时文件、`fsync` 和同文件系统原子移动避免半截任务。
 - **供应商无关**：Claude Code、Codex、GLM、DeepSeek 或本地脚本都可作为执行者/审核者。
 - **无运行依赖**：Python 标准库实现。
@@ -62,6 +64,11 @@ boxporter add \
   --id fix-login \
   --title "Fix login loop" \
   --body "Reproduce the redirect loop, fix the root cause, and add a regression test."
+boxporter add \
+  --id login-e2e \
+  --depends-on fix-login \
+  --title "Verify login end to end" \
+  --body "Run the browser acceptance flow after fix-login passes."
 boxporter promote
 boxporter status
 ```
@@ -83,12 +90,14 @@ boxporter submit --author glm
 
 ```bash
 boxporter review \
-  --result PASS \
+  --result REVISE \
   --author codex \
-  --content "Root cause fixed and regression gate passed."
+  --content "One acceptance gate still fails." \
+  --required-change LOGIN-REDIRECT-GATE
 ```
 
-任务将原子移动到 `passed/`。如果审核不通过，使用 `--result REVISE`，任务会交回执行者。
+审核问题不减少时任务进入 `WAITING_USER`；减少时允许有界续修。最终 `PASS` 后任务才会
+原子移动到 `passed/`。
 
 完整的手工演示：
 
@@ -105,6 +114,8 @@ sh examples/manual-flow.sh
   "poll_seconds": 1200,
   "stale_seconds": 2400,
   "retry_seconds": 3600,
+  "max_revisions": 2,
+  "max_progress_extensions": 2,
   "executor_command": [],
   "reviewer_command": []
 }
@@ -135,6 +146,8 @@ BoxPorter 不是 Agent 推理框架，也不是分布式消息队列。它面向
 
 - [协议与状态机](docs/PROTOCOL.md)
 - [安全模型](docs/SECURITY.md)
+- [版本记录](CHANGELOG.md)
+- [已知问题与限制](KNOWN_ISSUES.md)
 - [示例任务](examples/demo-task.md)
 
 ## 测试

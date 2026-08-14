@@ -125,6 +125,20 @@ def submission_sha(result_path: Path, verify_path: Path) -> str:
     return hashlib.sha256(canonical).hexdigest()
 
 
+def normalize_required_changes(value: str | Iterable[str]) -> list[str]:
+    raw_items = value.split(",") if isinstance(value, str) else list(value)
+    changes: list[str] = []
+    for raw in raw_items:
+        item = str(raw).strip()
+        if not item or item.lower() == "none":
+            continue
+        if "\n" in item or "\r" in item:
+            raise BoxPorterError("required changes must be single-line values")
+        if item not in changes:
+            changes.append(item)
+    return changes
+
+
 @dataclass(frozen=True)
 class Layout:
     root: Path
@@ -236,6 +250,8 @@ class BoxPorter:
             "poll_seconds": 1200,
             "stale_seconds": 2400,
             "retry_seconds": 3600,
+            "max_revisions": 2,
+            "max_progress_extensions": 2,
             "executor_command": [],
             "reviewer_command": [],
         }
@@ -245,7 +261,14 @@ class BoxPorter:
             atomic_json(self.layout.state, self._default_state())
         self._event("initialized", root=str(self.layout.root))
 
-    def add(self, task_id: str, title: str, body: str, author: str = "human") -> Path:
+    def add(
+        self,
+        task_id: str,
+        title: str,
+        body: str,
+        author: str = "human",
+        depends_on: Iterable[str] = (),
+    ) -> Path:
         self._require_initialized()
         self._validate_task_id(task_id)
         if self._find_task(task_id):
@@ -262,6 +285,11 @@ class BoxPorter:
             "updated_at": created,
             "attempt": 0,
         }
+        dependencies = list(dict.fromkeys(str(item).strip() for item in depends_on if str(item).strip()))
+        for dependency in dependencies:
+            self._validate_task_id(dependency)
+        if dependencies:
+            metadata["depends_on"] = ",".join(dependencies)
         path = self.layout.pending / f"{task_id}.md"
         atomic_write(path, render_document(metadata, body))
         self._event("task_added", task_id=task_id)
@@ -274,9 +302,19 @@ class BoxPorter:
         candidates = sorted(
             self.layout.pending.glob("*.md"), key=lambda path: (path.stat().st_mtime_ns, path.name)
         )
-        if not candidates:
+        passed_ids = self._passed_task_ids()
+        eligible: list[Path] = []
+        for candidate in candidates:
+            metadata, _ = parse_document(candidate)
+            self._validate_task(metadata)
+            dependencies = {
+                item.strip() for item in metadata.get("depends_on", "").split(",") if item.strip()
+            }
+            if dependencies.issubset(passed_ids):
+                eligible.append(candidate)
+        if not eligible:
             return None
-        source = candidates[0]
+        source = eligible[0]
         metadata, body = parse_document(source)
         self._validate_task(metadata)
         metadata.update(state="READY", handoff_to="executor", updated_at=now_iso())
@@ -341,11 +379,14 @@ class BoxPorter:
         result: str,
         author: str,
         content: str,
-        required_changes: str = "none",
+        required_changes: str | Iterable[str] = (),
     ) -> Path | None:
         result = result.upper()
         if result not in {"PASS", "REVISE", "INVALID"}:
             raise BoxPorterError("review result must be PASS, REVISE, or INVALID")
+        changes = normalize_required_changes(required_changes)
+        if result != "PASS" and not changes:
+            raise BoxPorterError("REVISE and INVALID reviews require concrete required changes")
         metadata, body = self.active_task()
         if metadata["state"] != "REVIEW_PENDING":
             raise BoxPorterError(f"cannot review from state {metadata['state']}")
@@ -364,15 +405,23 @@ class BoxPorter:
             "result": result,
             "task": metadata["task_id"],
             "submission_sha256": digest,
-            "required_changes": required_changes,
+            "required_changes": json.dumps(changes, ensure_ascii=False, separators=(",", ":")),
         }
+        policy = None if result == "PASS" else self._record_revision(metadata["task_id"], digest, changes)
         atomic_write(self.layout.reviewer_report, render_document(report, content))
         self._event("review_recorded", task_id=metadata["task_id"], result=result)
         if result == "PASS":
             metadata.update(state="PASS", handoff_to="none", updated_at=now_iso())
             atomic_write(self.layout.active, render_document(metadata, body))
             return self.archive_passed()
-        metadata.update(state="REVISE", handoff_to="executor", updated_at=now_iso())
+        if policy is None:  # pragma: no cover - guarded by the PASS branch above
+            raise BoxPorterError("missing review policy")
+        metadata.update(
+            state="REVISE" if policy["continue"] else "WAITING_USER",
+            handoff_to="executor" if policy["continue"] else "human",
+            updated_at=now_iso(),
+            review_policy=policy["reason"],
+        )
         atomic_write(self.layout.active, render_document(metadata, body))
         return None
 
@@ -564,7 +613,16 @@ class BoxPorter:
         if not isinstance(raw_config, dict):
             raise BoxPorterError(f"invalid config: {self.layout.config}")
         config = cast(dict[str, Any], raw_config)
-        required_ints = ("poll_seconds", "stale_seconds", "retry_seconds")
+        # Backward-compatible defaults for roots created by BoxPorter 0.1.
+        config.setdefault("max_revisions", 2)
+        config.setdefault("max_progress_extensions", 2)
+        required_ints = (
+            "poll_seconds",
+            "stale_seconds",
+            "retry_seconds",
+            "max_revisions",
+            "max_progress_extensions",
+        )
         for key in required_ints:
             if not isinstance(config.get(key), int) or config[key] <= 0:
                 raise BoxPorterError(f"config {key} must be a positive integer")
@@ -585,7 +643,65 @@ class BoxPorter:
 
     @staticmethod
     def _default_state() -> dict[str, Any]:
-        return {"last_trigger_key": "", "last_trigger_at": 0, "last_pid": 0}
+        return {
+            "last_trigger_key": "",
+            "last_trigger_at": 0,
+            "last_pid": 0,
+            "review_history": {},
+        }
+
+    def _record_revision(
+        self, task_id: str, digest: str, required_changes: list[str]
+    ) -> dict[str, Any]:
+        config = self._load_config()
+        state = self._load_state()
+        raw_history = state.setdefault("review_history", {})
+        if not isinstance(raw_history, dict):
+            raw_history = {}
+            state["review_history"] = raw_history
+        history = raw_history.setdefault(task_id, [])
+        if not isinstance(history, list):
+            history = []
+            raw_history[task_id] = history
+        replayed = bool(history and history[-1].get("submission_sha256") == digest)
+        if replayed and history[-1].get("required_changes") != required_changes:
+            raise BoxPorterError("conflicting review replay for the same submission")
+        if not replayed:
+            history.append(
+                {
+                    "submission_sha256": digest,
+                    "required_changes": required_changes,
+                    "reviewed_at": now_iso(),
+                }
+            )
+            atomic_json(self.layout.state, state)
+
+        attempts = len(history)
+        base_limit = int(config["max_revisions"])
+        absolute_limit = base_limit + int(config["max_progress_extensions"])
+        if attempts < base_limit:
+            return {
+                "continue": True,
+                "reason": "within_base_limit",
+                "attempts": attempts,
+                "replayed": replayed,
+            }
+        previous = history[-2].get("required_changes", []) if len(history) >= 2 else []
+        progressing = len(required_changes) < len(previous)
+        if progressing and attempts < absolute_limit:
+            return {
+                "continue": True,
+                "reason": "required_change_count_reduced",
+                "attempts": attempts,
+                "replayed": replayed,
+            }
+        reason = "absolute_review_limit" if attempts >= absolute_limit else "review_not_converging"
+        return {
+            "continue": False,
+            "reason": reason,
+            "attempts": attempts,
+            "replayed": replayed,
+        }
 
     def _event(self, event: str, **fields: Any) -> None:
         record = {"time": now_iso(), "event": event, **fields}
@@ -639,6 +755,17 @@ class BoxPorter:
             if metadata.get("task_id") == task_id:
                 return path
         return None
+
+    def _passed_task_ids(self) -> set[str]:
+        task_ids: set[str] = set()
+        for path in self.layout.passed.glob("*/task.md"):
+            try:
+                metadata, _ = parse_document(path)
+            except BoxPorterError:
+                continue
+            if metadata.get("task_id"):
+                task_ids.add(metadata["task_id"])
+        return task_ids
 
     def _clear_reports(self) -> None:
         for path in (

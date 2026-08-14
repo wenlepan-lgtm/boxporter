@@ -21,6 +21,7 @@ def parser() -> argparse.ArgumentParser:
     add.add_argument("--id", required=True)
     add.add_argument("--title", required=True)
     add.add_argument("--author", default="human")
+    add.add_argument("--depends-on", action="append", default=[])
     source = add.add_mutually_exclusive_group(required=True)
     source.add_argument("--body")
     source.add_argument("--file", type=Path)
@@ -40,7 +41,8 @@ def parser() -> argparse.ArgumentParser:
     review.add_argument("--result", choices=("PASS", "REVISE", "INVALID"), required=True)
     review.add_argument("--author", required=True)
     review.add_argument("--content", required=True)
-    review.add_argument("--required-changes", default="none")
+    review.add_argument("--required-change", action="append", default=[])
+    review.add_argument("--required-changes", default="", help="Legacy comma-separated form")
 
     block = commands.add_parser("block", help="Move the active task to the blocked box")
     block.add_argument("--reason", required=True)
@@ -59,7 +61,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"initialized: {porter.layout.root}")
         elif args.command == "add":
             body = args.body if args.body is not None else args.file.read_text(encoding="utf-8")
-            print(porter.add(args.id, args.title, body, args.author))
+            print(porter.add(args.id, args.title, body, args.author, args.depends_on))
         elif args.command == "promote":
             print(porter.promote() or "no pending task")
         elif args.command == "status":
@@ -77,7 +79,12 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "submit":
             print(porter.submit(args.author, args.content))
         elif args.command == "review":
-            print(porter.review(args.result, args.author, args.content, args.required_changes) or "revision requested")
+            changes = args.required_change or args.required_changes
+            archive = porter.review(args.result, args.author, args.content, changes)
+            if archive:
+                print(archive)
+            else:
+                print(porter.active_task()[0]["state"].lower())
         elif args.command == "block":
             print(porter.block(args.reason))
         elif args.command == "tick":

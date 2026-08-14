@@ -21,6 +21,8 @@ pending/ -> active/current.md -> passed/
 - One active task at a time
 - Executor/reviewer separation
 - Reviews bound to the SHA-256 of `result.md` and `verify.md`
+- Dependency-aware promotion through `depends_on`
+- Bounded review convergence: two base rounds, up to two progress-only extensions
 - Atomic writes and atomic evidence-bundle archival
 - Vendor-neutral command hooks
 - Python standard library only
@@ -34,6 +36,7 @@ pip install -e .
 
 boxporter init
 boxporter add --id demo --title "Fix a bug" --body "Fix the root cause and add a regression test."
+boxporter add --id demo-e2e --depends-on demo --title "Verify the fix" --body "Run E2E after demo passes."
 boxporter promote
 boxporter transition WORKING --handoff-to executor
 ```
@@ -46,8 +49,17 @@ boxporter submit --author executor
 boxporter review --result PASS --author reviewer --content "All acceptance gates verified."
 ```
 
-See the [Chinese README](README.md) and [protocol](docs/PROTOCOL.md) for the complete
-workflow and automation configuration.
+For a revision, provide concrete IDs. Repeating the same unresolved set pauses for a
+human; strictly shrinking sets can continue up to the configured absolute cap.
+
+```bash
+boxporter review --result REVISE --author reviewer \
+  --content "One gate remains." --required-change LOGIN-REDIRECT-GATE
+```
+
+See the [Chinese README](README.md), [protocol](docs/PROTOCOL.md), and
+[changelog](CHANGELOG.md) for the complete workflow and release history. Current
+limitations are tracked in [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
 
 ## License
 

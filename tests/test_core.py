@@ -42,6 +42,18 @@ class BoxPorterTest(unittest.TestCase):
         with self.assertRaisesRegex(BoxPorterError, "already exists"):
             self.porter.add("task-1", "Duplicate", "No")
 
+    def test_promote_skips_task_until_dependencies_pass(self):
+        self.porter.add("a-child", "Child", "Wait", depends_on=["z-parent"])
+        self.porter.add("z-parent", "Parent", "Run first")
+        self.porter.promote()
+        self.assertEqual(self.porter.active_task()[0]["task_id"], "z-parent")
+        self.porter.transition("WORKING")
+        self.write_evidence()
+        self.porter.submit("executor-a")
+        self.porter.review("PASS", "reviewer-b", "Parent passed")
+        self.porter.promote()
+        self.assertEqual(self.porter.active_task()[0]["task_id"], "a-child")
+
     def test_submission_is_content_addressed(self):
         self.add_and_promote()
         self.porter.transition("WORKING")
@@ -70,6 +82,44 @@ class BoxPorterTest(unittest.TestCase):
         metadata, _ = self.porter.active_task()
         self.assertEqual(metadata["state"], "REVISE")
         self.assertEqual(metadata["handoff_to"], "executor")
+
+    def test_identical_second_review_pauses_for_human(self):
+        self.add_and_promote()
+        for index in range(2):
+            self.write_evidence(f"done-{index}", f"tests-{index}")
+            self.porter.submit("executor-a")
+            self.porter.review("REVISE", "reviewer-b", "Needs work", ["GATE-A", "GATE-B"])
+        metadata, _ = self.porter.active_task()
+        self.assertEqual(metadata["state"], "WAITING_USER")
+        self.assertEqual(metadata["review_policy"], "review_not_converging")
+
+    def test_shrinking_changes_allow_two_extensions_but_cap_at_four_reviews(self):
+        self.add_and_promote()
+        change_sets = [
+            ["A", "B", "C", "D"],
+            ["B", "C", "D"],
+            ["C", "D"],
+            ["D"],
+        ]
+        observed_states = []
+        for index, changes in enumerate(change_sets):
+            self.write_evidence(f"done-{index}", f"tests-{index}")
+            self.porter.submit("executor-a")
+            self.porter.review("REVISE", "reviewer-b", "Needs work", changes)
+            observed_states.append(self.porter.active_task()[0]["state"])
+        self.assertEqual(observed_states, ["REVISE", "REVISE", "REVISE", "WAITING_USER"])
+        self.assertEqual(self.porter.active_task()[0]["review_policy"], "absolute_review_limit")
+
+    def test_revision_record_is_idempotent_for_same_submission(self):
+        first = self.porter._record_revision("task-1", "digest-1", ["GATE-A"])
+        replay = self.porter._record_revision("task-1", "digest-1", ["GATE-A"])
+        state = json.loads(self.porter.layout.state.read_text())
+        self.assertEqual(first["attempts"], 1)
+        self.assertEqual(replay["attempts"], 1)
+        self.assertTrue(replay["replayed"])
+        self.assertEqual(len(state["review_history"]["task-1"]), 1)
+        with self.assertRaisesRegex(BoxPorterError, "conflicting review replay"):
+            self.porter._record_revision("task-1", "digest-1", ["GATE-B"])
 
     def test_pass_archives_and_preserves_human_readable_record(self):
         self.add_and_promote()
@@ -124,6 +174,13 @@ class BoxPorterTest(unittest.TestCase):
         self.porter.layout.config.write_text(json.dumps(config), encoding="utf-8")
         with self.assertRaisesRegex(BoxPorterError, "positive integer"):
             self.porter.doctor()
+
+    def test_version_01_config_uses_safe_review_defaults(self):
+        config = json.loads(self.porter.layout.config.read_text())
+        config.pop("max_revisions")
+        config.pop("max_progress_extensions")
+        self.porter.layout.config.write_text(json.dumps(config), encoding="utf-8")
+        self.assertIn("config: ok", self.porter.doctor())
 
 
 if __name__ == "__main__":

@@ -26,6 +26,20 @@ WORKING -> BLOCKED -> blocked/
 `PASS` requires a reviewer report tied to the exact SHA-256 identity of `result.md` and
 `verify.md`. Changing either file after submission invalidates the review.
 
+## Dependencies
+
+Tasks may declare a comma-separated `depends_on` field. Promotion scans pending tasks in
+stable order and selects the first task whose dependencies already exist in `passed/`.
+An unresolved dependency never becomes active merely because it is the oldest task.
+
+## Bounded review convergence
+
+`REVISE` and `INVALID` reviews must provide concrete required-change IDs. The default
+policy allows two review rounds. If the number of concrete remaining changes strictly
+decreases, two additional rounds may be used. An unchanged/increased set, or a fourth
+non-PASS review, moves the task to `WAITING_USER`. This prevents both premature stopping
+and unbounded executor/reviewer loops.
+
 ## Atomicity
 
 Documents are written to a temporary file in the destination directory, flushed with
@@ -43,6 +57,7 @@ Executor and reviewer reports use `BOXPORTER_AGENT_REPORT_V1` and include:
 - task ID;
 - result;
 - submission SHA-256.
+- JSON-encoded required-change IDs for non-PASS results.
 
 The reviewer must not reuse the executor's conclusion. It independently checks the
 acceptance criteria and evidence for the exact submission.
