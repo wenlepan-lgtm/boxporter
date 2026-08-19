@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.boxporter.web</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/alamn/BoxPorter/.venv/bin/boxporter-v2</string>
+    <string>--data-dir</string>
+    <string>/Users/alamn/BoxPorter/data</string>
+    <string>serve</string>
+    <string>--host</string>
+    <string>127.0.0.1</string>
+    <string>--port</string>
+    <string>3088</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/alamn/BoxPorter</string>
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+  <key>StandardOutPath</key>
+  <string>/Users/alamn/BoxPorter/logs/web.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/alamn/BoxPorter/logs/web.log</string>
+  <key>ProcessType</key>
+  <string>Background</string>
+</dict>
+</plist>

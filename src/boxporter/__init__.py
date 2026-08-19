@@ -1,6 +1,6 @@
 """BoxPorter public API."""
 
-from .core import BoxPorter, BoxPorterError
+from .v0 import BoxPorter, BoxPorterError
 
 __all__ = ["BoxPorter", "BoxPorterError"]
-__version__ = "0.2.0"
+__version__ = "1.1.0"

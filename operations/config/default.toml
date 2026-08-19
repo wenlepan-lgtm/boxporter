@@ -1,0 +1,31 @@
+# BoxPorter 默认配置模板（安全默认值；本机覆盖见 local.toml，不入 Git）
+# 注意：密码、API Key 一律使用 Secret Reference 或环境变量，绝不写入本文件。
+
+[daemon]
+tick_seconds = 15
+heartbeat_seconds = 30
+lease_ttl_seconds = 300
+
+[policy]
+mode = "SUPERVISED"            # SUPERVISED / AWAY / PAUSED
+max_concurrent = 1
+auto_review = true
+daily_token_budget = 2000000
+max_recoveries_per_attempt = 2
+allowed_risk_levels = ["low", "medium"]
+
+[web]
+host = "127.0.0.1"
+port = 3088
+
+# Runner 选择由环境变量决定（见 runners/__init__.py build_registry）：
+#   BOXPORTER_RUNNER=mock + BOXPORTER_ALLOW_MOCK=1           演示/干燥运行（零模型）
+#   BOXPORTER_RUNNER=openhands + BOXPORTER_OPENHANDS_API_KEY 真实执行
+#   BOXPORTER_DSH_COMMAND='[...]' / BOXPORTER_EXECUTOR_COMMAND='[...]'
+# 不配置任何 Runner 时 daemon/tick 启动即报错（P0-A），不会静默空转。
+
+[paths]
+data_dir = "/Users/Alamn/BoxPorter/data"
+worktrees_root = "/Users/Alamn/BoxPorter/worktrees"
+evidence_root = "/Users/Alamn/BoxPorter/artifacts"
+backup_root = "/Users/Alamn/BoxPorter/backups"

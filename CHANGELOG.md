@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.1.0 - 2026-08-19
+
+- Add the V2 task, attempt, run, lease, event, and four-box lifecycle model.
+- Add isolated executor/reviewer runs with worktree-bound submission manifests and acceptance gates.
+- Add event-driven scheduling, retry backoff, token budgets, progress detection, circuit breaking,
+  approvals, context packs, and crash recovery.
+- Add command, DeepSeek Harness, and pinned OpenHands runner adapters.
+- Add the FastAPI control plane, project-scoped Web console, run management, health components,
+  blockers, and replayable SSE event cursors.
+- Add SQLite migration, backup/restore, launchd, log rotation, and security operations guidance.
+- Keep runtime credentials, SQLite databases, WAL/SHM files, logs, caches, and artifacts outside
+  the Git repository.
+
 ## 0.2.0 - 2026-08-14
 
 - Add dependency-aware task promotion with `depends_on`.

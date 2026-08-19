@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "boxporter"
-version = "0.2.0"
+version = "1.1.0"
 description = "A human-readable task-box protocol for coordinating coding agents"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 license = "MIT"
 authors = [{name = "Wenle Pan"}]
 keywords = ["ai-agents", "multi-agent", "orchestration", "claude-code", "codex"]
@@ -17,10 +17,15 @@ classifiers = [
   "Programming Language :: Python :: 3.10",
   "Topic :: Software Development :: Build Tools",
 ]
-dependencies = []
+dependencies = [
+    "fastapi>=0.115",
+    "python-multipart>=0.0.9",
+    "uvicorn>=0.30",
+]
 
 [dependency-groups]
 dev = [
+  "httpx>=0.27",
   "mypy>=1.10",
   "pytest>=8",
   "ruff>=0.9",
@@ -28,6 +33,12 @@ dev = [
 
 [project.scripts]
 boxporter = "boxporter.cli:main"
+boxporter-v2 = "boxporter.cli_v2:main"
+
+[project.optional-dependencies]
+openhands = [
+    "openhands-sdk==1.42.1",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -36,8 +47,15 @@ where = ["src"]
 line-length = 100
 target-version = "py310"
 
+[tool.ruff.lint.per-file-ignores]
+"src/boxporter/api/*.py" = ["B008"]  # FastAPI Depends must live in defaults
+
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.12"
 strict = true
 files = ["src"]
 exclude = ["^(build|dist|tests)/"]
+
+[[tool.mypy.overrides]]
+module = ["openhands", "openhands.*"]
+ignore_missing_imports = true

@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BoxPorter 搬运猴</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header id="topbar" class="hidden">
+  <span class="brand">🐒 BoxPorter</span>
+  <select id="project-selector" title="当前项目"></select>
+  <span id="mode-badge" class="badge">…</span>
+  <span id="conn-badge" class="badge gray">未连接</span>
+  <span id="health-badge" class="badge">…</span>
+  <nav>
+    <button data-view="dashboard" class="active">总览</button>
+    <button data-view="tasks">任务</button>
+    <button data-view="events">事件</button>
+    <button data-view="approvals">阻塞/审批</button>
+    <button data-view="system">系统</button>
+    <button data-view="sessions">设置/会话</button>
+    <button id="logout">退出</button>
+  </nav>
+</header>
+
+<section id="login-view">
+  <form id="login-form">
+    <h1>🐒 BoxPorter 搬运猴</h1>
+    <input id="login-user" value="admin" hidden>
+    <input id="login-password" type="password" placeholder="密码" autocomplete="current-password" required>
+    <button type="submit">登录</button>
+    <p id="login-error" class="error"></p>
+  </form>
+</section>
+
+<main id="app-view" class="hidden">
+  <section id="view-dashboard">
+    <h2>四箱看板</h2>
+    <div id="boxes" class="boxes"></div>
+    <div id="needs-user">
+      <h3>需要你处理</h3>
+      <ul id="needs-user-list"></ul>
+    </div>
+  </section>
+
+  <section id="view-tasks" class="hidden">
+    <h2>任务 <button id="new-task-btn">＋ 新建任务</button></h2>
+    <div id="recent-tasks"><h3>最近创建</h3><div id="recent-task-list"></div></div>
+    <div id="task-list"></div>
+    <div id="task-detail"></div>
+  </section>
+
+  <!-- 新建任务弹窗 -->
+  <div id="task-modal" class="modal hidden">
+    <div class="modal-box">
+      <h3>新建任务 <button id="task-modal-close" class="right">×</button></h3>
+      <label>项目
+        <select id="task-project-select"></select>
+      </label>
+      <div class="tabs">
+        <button id="tab-json" class="active">粘贴 JSON</button>
+        <button id="tab-file">选择文件</button>
+      </div>
+      <textarea id="task-spec-text" placeholder='粘贴 BOXPORTER_TASK_V2 JSON，例如：&#10;{&#10;  "schema": "BOXPORTER_TASK_V2",&#10;  "task_id": "demo-1",&#10;  "project_id": "boxporter",&#10;  "title": "示例任务",&#10;  "objective": "实现……",&#10;  "workspace": "/绝对路径",&#10;  "acceptance_criteria": ["……"]&#10;}'></textarea>
+      <input id="task-spec-file" type="file" accept=".json,application/json" class="hidden">
+      <div id="client-errors"></div>
+      <div id="server-result"></div>
+      <button id="task-create-submit">创建任务</button>
+      <div id="task-success-actions" class="actions hidden"></div>
+    </div>
+  </div>
+
+  <section id="view-events" class="hidden">
+    <h2>实时事件</h2>
+    <button id="events-clear">清空</button>
+    <pre id="event-log"></pre>
+  </section>
+
+  <section id="view-approvals" class="hidden">
+    <h2>审批中心</h2>
+    <p class="meta">审批绑定精确动作、目标、次数与有效期；批准需要重新认证。</p>
+    <div id="approval-list"></div>
+    <h2>阻塞看板</h2>
+    <p class="meta">等待外部条件；带探针的阻塞由调度器零模型自动重探测。</p>
+    <div id="blocker-list"></div>
+  </section>
+
+  <section id="view-system" class="hidden">
+    <h2>系统健康</h2>
+    <div id="health-panel"></div>
+    <h2>Runner 能力</h2>
+    <p class="meta">恢复能力边界：不支持 checkpoint/resume 的 Runner 在中断后不会继续同一会话，而是按预算走新 Attempt（ADR-015）。</p>
+    <div id="runner-capabilities"></div>
+  </section>
+
+  <section id="view-sessions" class="hidden">
+    <h2>运行策略</h2>
+    <div id="mode-box">
+      <button data-mode="SUPERVISED">SUPERVISED（有人值守）</button>
+      <button data-mode="AWAY">AWAY（无人值守）</button>
+      <button data-mode="PAUSED">PAUSED（暂停调度）</button>
+    </div>
+    <p id="mode-status" class="meta"></p>
+    <h2>设备会话</h2>
+    <div id="session-list"></div>
+    <div id="reauth-box">
+      <h3>高风险操作认证</h3>
+      <input id="reauth-password" type="password" placeholder="重新输入密码" autocomplete="current-password">
+      <button id="reauth-submit">认证（10 分钟有效）</button>
+      <span id="reauth-status"></span>
+    </div>
+  </section>
+</main>
+
+<script src="/app.js"></script>
+</body>
+</html>

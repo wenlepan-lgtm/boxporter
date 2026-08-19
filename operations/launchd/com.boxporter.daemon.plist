@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.boxporter.daemon</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/alamn/BoxPorter/.venv/bin/boxporter-v2</string>
+    <string>--data-dir</string>
+    <string>/Users/alamn/BoxPorter/data</string>
+    <string>daemon</string>
+    <string>--policy</string>
+    <string>SUPERVISED</string>
+    <string>--worktrees-root</string>
+    <string>/Users/alamn/BoxPorter/worktrees</string>
+    <string>--tick-seconds</string>
+    <string>15</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/alamn/BoxPorter</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <!-- 演示/干燥运行模式（零模型调用）。接入真实 Runner 时改为：
+         BOXPORTER_RUNNER=openhands + BOXPORTER_OPENHANDS_API_KEY（Keychain/环境变量） -->
+    <key>BOXPORTER_RUNNER</key>
+    <string>mock</string>
+    <key>BOXPORTER_ALLOW_MOCK</key>
+    <string>1</string>
+  </dict>
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+  <key>StandardOutPath</key>
+  <string>/Users/alamn/BoxPorter/logs/daemon.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/alamn/BoxPorter/logs/daemon.log</string>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>Nice</key>
+  <integer>10</integer>
+</dict>
+</plist>

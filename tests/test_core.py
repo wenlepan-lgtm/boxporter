@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from boxporter.core import BoxPorter, BoxPorterError, parse_document, submission_sha
+from boxporter.v0 import BoxPorter, BoxPorterError, parse_document, submission_sha
 
 
 class BoxPorterTest(unittest.TestCase):

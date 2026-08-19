@@ -13,7 +13,7 @@ Markdown“任务箱”，让执行 Agent 完成实现，让另一个 Agent 独�
 大模型并重新加载全部上下文。** 本地协调器先用零 Token 的确定性代码检查文件；只有
 发生真正的交接、产生新提交或任务失去心跳时，才唤醒对应 Agent。
 
-## 为什么是三个箱子
+## 为什么是四个箱子
 
 ```text
 pending/  ->  active/current.md  ->  passed/

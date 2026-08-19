@@ -5,7 +5,7 @@ import json
 import sys
 from pathlib import Path
 
-from .core import BoxPorter, BoxPorterError
+from .v0 import BoxPorter, BoxPorterError
 
 
 def parser() -> argparse.ArgumentParser:
